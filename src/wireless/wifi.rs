@@ -1,8 +1,6 @@
 use esp_idf_svc::bt::{self, BtDriver};
 use esp_idf_svc::eventloop::EspSystemEventLoop;
-use esp_idf_svc::hal::into_ref;
 use esp_idf_svc::hal::modem::Modem;
-use esp_idf_svc::hal::peripheral::{Peripheral, PeripheralRef};
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
 use esp_idf_svc::timer::EspTaskTimerService;
 use esp_idf_svc::wifi::{AsyncWifi, EspWifi};
@@ -26,7 +24,7 @@ pub type EspWifiMatterStack<'a, E> = EspWirelessMatterStack<'a, Wifi, E>;
 
 /// A `Wifi` trait implementation via ESP-IDF's Wifi/BT modem
 pub struct EspMatterWifi<'a, 'd, M = BuiltinMdns> {
-    modem: PeripheralRef<'d, Modem>,
+    modem: Modem<'d>,
     sysloop: EspSystemEventLoop,
     timer: EspTaskTimerService,
     nvs: EspDefaultNvsPartition,
@@ -37,7 +35,7 @@ pub struct EspMatterWifi<'a, 'd, M = BuiltinMdns> {
 impl<'a, 'd> EspMatterWifi<'a, 'd, BuiltinMdns> {
     /// Create a new instance of the `EspMatterWifi` type .
     pub fn new_with_builtin_mdns<E>(
-        modem: impl Peripheral<P = Modem> + 'd,
+        modem: Modem<'d>,
         sysloop: EspSystemEventLoop,
         timer: EspTaskTimerService,
         nvs: EspDefaultNvsPartition,
@@ -56,7 +54,7 @@ where
 {
     /// Create a new instance of the `EspMatterWifi` type.
     pub fn new<E>(
-        modem: impl Peripheral<P = Modem> + 'd,
+        modem: Modem<'d>,
         sysloop: EspSystemEventLoop,
         timer: EspTaskTimerService,
         nvs: EspDefaultNvsPartition,
@@ -78,15 +76,13 @@ where
 
     /// Wrap existing parts into a new instance of the `EspMatterWifi` type.
     pub fn wrap(
-        modem: impl Peripheral<P = Modem> + 'd,
+        modem: Modem<'d>,
         sysloop: EspSystemEventLoop,
         timer: EspTaskTimerService,
         nvs: EspDefaultNvsPartition,
         mdns: M,
         ble_context: &'a EspBtpGattContext,
     ) -> Self {
-        into_ref!(modem);
-
         Self {
             modem,
             sysloop,
@@ -103,7 +99,7 @@ impl Gatt for EspMatterWifi<'_, '_> {
     where
         A: GattTask,
     {
-        let bt = BtDriver::new(&mut self.modem, Some(self.nvs.clone())).unwrap();
+        let bt = BtDriver::new(unsafe { self.modem.reborrow() }, Some(self.nvs.clone())).unwrap();
 
         let peripheral =
             EspBtpGattPeripheral::<bt::Ble>::new(GATTS_APP_ID, bt, self.ble_context).unwrap();
@@ -119,7 +115,7 @@ impl rs_matter_stack::wireless::Wifi for EspMatterWifi<'_, '_> {
     {
         let wifi = AsyncWifi::wrap(
             EspWifi::new(
-                &mut self.modem,
+                unsafe { self.modem.reborrow() },
                 self.sysloop.clone(),
                 Some(self.nvs.clone()),
             )
@@ -146,11 +142,13 @@ impl WifiCoex for EspMatterWifi<'_, '_> {
     where
         A: WifiCoexTask,
     {
+        let modem = unsafe { self.modem.reborrow() };
+
         #[cfg(not(esp32c6))]
-        let (wifi_p, bt_p) = self.modem.split_ref();
+        let (wifi_p, bt_p) = modem.split();
 
         #[cfg(esp32c6)]
-        let (wifi_p, _, bt_p) = self.modem.split_ref();
+        let (wifi_p, _, bt_p) = modem.split();
 
         let wifi = AsyncWifi::wrap(
             EspWifi::new(wifi_p, self.sysloop.clone(), Some(self.nvs.clone()))

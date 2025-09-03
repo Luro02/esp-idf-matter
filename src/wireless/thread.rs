@@ -2,9 +2,7 @@ use alloc::sync::Arc;
 
 use esp_idf_svc::bt::{self, BtDriver};
 use esp_idf_svc::eventloop::EspSystemEventLoop;
-use esp_idf_svc::hal::into_ref;
 use esp_idf_svc::hal::modem::Modem;
-use esp_idf_svc::hal::peripheral::{Peripheral, PeripheralRef};
 use esp_idf_svc::io::vfs::MountedEventfs;
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
 use esp_idf_svc::thread::EspThread;
@@ -31,7 +29,7 @@ pub type EspThreadMatterStack<'a, E> = EspWirelessMatterStack<'a, Thread, E>;
 
 /// A `Thread` trait implementation via ESP-IDF's Thread/BT modem
 pub struct EspMatterThread<'a, 'd> {
-    modem: PeripheralRef<'d, Modem>,
+    modem: Modem<'d>,
     sysloop: EspSystemEventLoop,
     nvs: EspDefaultNvsPartition,
     mounted_event_fs: Arc<MountedEventfs>,
@@ -41,7 +39,7 @@ pub struct EspMatterThread<'a, 'd> {
 impl<'a, 'd> EspMatterThread<'a, 'd> {
     /// Create a new instance of the `EspMatterThread` type.
     pub fn new<E>(
-        modem: impl Peripheral<P = Modem> + 'd,
+        modem: Modem<'d>,
         sysloop: EspSystemEventLoop,
         nvs: EspDefaultNvsPartition,
         mounted_event_fs: Arc<MountedEventfs>,
@@ -61,14 +59,12 @@ impl<'a, 'd> EspMatterThread<'a, 'd> {
 
     /// Wrap existing parts into a new instance of the `EspMatterThread` type.
     pub fn wrap(
-        modem: impl Peripheral<P = Modem> + 'd,
+        modem: Modem<'d>,
         sysloop: EspSystemEventLoop,
         nvs: EspDefaultNvsPartition,
         mounted_event_fs: Arc<MountedEventfs>,
         ble_context: &'a EspBtpGattContext,
     ) -> Self {
-        into_ref!(modem);
-
         Self {
             modem,
             sysloop,
@@ -84,7 +80,7 @@ impl Gatt for EspMatterThread<'_, '_> {
     where
         A: GattTask,
     {
-        let bt = BtDriver::new(&mut self.modem, Some(self.nvs.clone())).unwrap();
+        let bt = BtDriver::new(unsafe { self.modem.reborrow() }, Some(self.nvs.clone())).unwrap();
 
         let peripheral =
             EspBtpGattPeripheral::<bt::Ble>::new(GATTS_APP_ID, bt, self.ble_context).unwrap();
@@ -99,7 +95,7 @@ impl rs_matter_stack::wireless::Thread for EspMatterThread<'_, '_> {
         A: ThreadTask,
     {
         let mut thread = EspThread::new(
-            &mut self.modem,
+            unsafe { self.modem.reborrow() },
             self.sysloop.clone(),
             self.nvs.clone(),
             self.mounted_event_fs.clone(),
@@ -133,11 +129,13 @@ impl ThreadCoex for EspMatterThread<'_, '_> {
     where
         A: ThreadCoexTask,
     {
+        let modem = unsafe { self.modem.reborrow() };
+
         #[cfg(not(esp32c6))]
-        let (thread_p, bt_p) = self.modem.split_ref();
+        let (thread_p, bt_p) = modem.split();
 
         #[cfg(esp32c6)]
-        let (_, thread_p, bt_p) = self.modem.split_ref();
+        let (_, thread_p, bt_p) = modem.split();
 
         let mut thread = EspThread::new(
             thread_p,

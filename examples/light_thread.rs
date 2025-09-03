@@ -106,7 +106,7 @@ mod example {
         let mounted_event_fs = Arc::new(MountedEventfs::mount(6)?);
         init_async_io(mounted_event_fs.clone())?;
 
-        reduce_bt_memory(&mut peripherals.modem)?;
+        reduce_bt_memory(unsafe { peripherals.modem.reborrow() })?;
 
         info!("Basics initialized");
 
