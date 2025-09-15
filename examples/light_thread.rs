@@ -45,6 +45,7 @@ mod example {
     use esp_idf_svc::eventloop::EspSystemEventLoop;
     use esp_idf_svc::hal::peripherals::Peripherals;
     use esp_idf_svc::hal::task::block_on;
+    use esp_idf_svc::hal::task::thread::ThreadSpawnConfiguration;
     use esp_idf_svc::io::vfs::MountedEventfs;
     use esp_idf_svc::nvs::EspDefaultNvsPartition;
 
@@ -59,11 +60,19 @@ mod example {
 
         info!("Starting...");
 
+        const STACK_SIZE: usize = 85 * 1024;
+
+        ThreadSpawnConfiguration::set(&ThreadSpawnConfiguration {
+            name: Some(b"matter\0"),
+            stack_size: STACK_SIZE,
+            ..Default::default()
+        })?;
+
         // Run in a higher-prio thread to avoid issues with `async-io` getting
         // confused by the low priority of the ESP IDF main task
         // Also allocate a very large stack (for now) as `rs-matter` futures do occupy quite some space
         let thread = std::thread::Builder::new()
-            .stack_size(75 * 1024)
+            .stack_size(STACK_SIZE)
             .spawn(run)
             .unwrap();
 

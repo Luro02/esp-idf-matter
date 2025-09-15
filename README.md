@@ -61,9 +61,11 @@ mod example {
     use esp_idf_matter::matter::{clusters, devices};
     use esp_idf_matter::wireless::{EspMatterWifi, EspWifiMatterStack};
 
+    use esp_idf_svc::bt::reduce_bt_memory;
     use esp_idf_svc::eventloop::EspSystemEventLoop;
     use esp_idf_svc::hal::peripherals::Peripherals;
     use esp_idf_svc::hal::task::block_on;
+    use esp_idf_svc::hal::task::thread::ThreadSpawnConfiguration;
     use esp_idf_svc::io::vfs::MountedEventfs;
     use esp_idf_svc::nvs::EspDefaultNvsPartition;
     use esp_idf_svc::timer::EspTaskTimerService;
@@ -79,11 +81,19 @@ mod example {
 
         info!("Starting...");
 
+        const STACK_SIZE: usize = 95 * 1024;
+
+        ThreadSpawnConfiguration::set(&ThreadSpawnConfiguration {
+            name: Some(b"matter\0"),
+            stack_size: STACK_SIZE,
+            ..Default::default()
+        })?;
+
         // Run in a higher-prio thread to avoid issues with `async-io` getting
         // confused by the low priority of the ESP IDF main task
         // Also allocate a very large stack (for now) as `rs-matter` futures do occupy quite some space
         let thread = std::thread::Builder::new()
-            .stack_size(85 * 1024)
+            .stack_size(STACK_SIZE)
             .spawn(run)
             .unwrap();
 
@@ -120,10 +130,12 @@ mod example {
         let sysloop = EspSystemEventLoop::take()?;
         let timers = EspTaskTimerService::new()?;
         let nvs = EspDefaultNvsPartition::take()?;
-        let peripherals = Peripherals::take()?;
+        let mut peripherals = Peripherals::take()?;
 
         let mounted_event_fs = Arc::new(MountedEventfs::mount(3)?);
-        init_async_io(mounted_event_fs)?;
+        init_async_io(mounted_event_fs.clone())?;
+
+        reduce_bt_memory(unsafe { peripherals.modem.reborrow() })?;
 
         // Our "light" on-off handler.
         // Can be anything implementing `Handler` or `AsyncHandler`
