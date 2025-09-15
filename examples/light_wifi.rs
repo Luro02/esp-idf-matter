@@ -40,7 +40,7 @@ mod example {
     use esp_idf_matter::matter::utils::select::Coalesce;
     use esp_idf_matter::matter::{clusters, devices};
     use esp_idf_matter::wireless::{EspMatterWifi, EspWifiMatterStack};
-    
+
     use esp_idf_svc::bt::reduce_bt_memory;
     use esp_idf_svc::eventloop::EspSystemEventLoop;
     use esp_idf_svc::hal::peripherals::Peripherals;
