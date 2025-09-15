@@ -101,7 +101,7 @@ mod example {
         let sysloop = EspSystemEventLoop::take()?;
         let timers = EspTaskTimerService::new()?;
         let nvs = EspDefaultNvsPartition::take()?;
-        let peripherals = Peripherals::take()?;
+        let mut peripherals = Peripherals::take()?;
 
         let mounted_event_fs = Arc::new(MountedEventfs::mount(3)?);
         init_async_io(mounted_event_fs.clone())?;
