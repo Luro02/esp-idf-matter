@@ -43,8 +43,8 @@ mod example {
 
     use esp_idf_svc::eventloop::EspSystemEventLoop;
     use esp_idf_svc::hal::peripherals::Peripherals;
-    use esp_idf_svc::hal::task::thread::ThreadSpawnConfiguration;
     use esp_idf_svc::hal::task::block_on;
+    use esp_idf_svc::hal::task::thread::ThreadSpawnConfiguration;
     use esp_idf_svc::handle::RawHandle;
     use esp_idf_svc::io::vfs::MountedEventfs;
     use esp_idf_svc::nvs::EspDefaultNvsPartition;
@@ -70,8 +70,7 @@ mod example {
         const STACK_SIZE: usize = 85 * 1024;
 
         ThreadSpawnConfiguration::set(&ThreadSpawnConfiguration {
-            name: Some(b"matter\0"),
-            stack_size: STACK_SIZE,
+            name: Some(c"matter"),
             ..Default::default()
         })?;
 

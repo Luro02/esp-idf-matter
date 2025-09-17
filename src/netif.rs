@@ -223,21 +223,35 @@ impl NetifInfoOwned {
     fn load_from_info(&mut self, l2_connected: bool, info: &NetifInfo<'_>) -> bool {
         let hw_addr: &[u8] = info.hw_addr;
 
+        let ipv4_addr = info
+            .ipv4_addrs
+            .first()
+            .copied()
+            .unwrap_or(Ipv4Addr::UNSPECIFIED);
+
+        let ipv6_addr = {
+            let ipv6_addr = if matches!(info.netif_type, InterfaceTypeEnum::Thread) {
+                // For Thread: return the first Ipv6 address
+                // Does not really matter what is returned, as the Ipv6 Thread address
+                // returned here is FYI only, and is not used for opening the Matter stack
+                // or for mDNS-over-Thread (SRP)
+                info.ipv6_addrs.first()
+            } else {
+                // For Wifi: locate the link-local Ipv6 address
+                info.ipv6_addrs
+                    .iter()
+                    .filter(|ipv6| ipv6.is_unicast_link_local())
+                    .next()
+            };
+
+            ipv6_addr.copied().unwrap_or(Ipv6Addr::UNSPECIFIED)
+        };
+
         let changed = self.name != info.name
             || self.operational != info.operational && l2_connected
             || self.hw_addr != hw_addr
-            || self.ipv4_addr
-                != info
-                    .ipv4_addrs
-                    .first()
-                    .copied()
-                    .unwrap_or(Ipv4Addr::UNSPECIFIED)
-            || self.ipv6_addr
-                != info
-                    .ipv6_addrs
-                    .first()
-                    .copied()
-                    .unwrap_or(Ipv6Addr::UNSPECIFIED)
+            || self.ipv4_addr != ipv4_addr
+            || self.ipv6_addr != ipv6_addr
             || self.netif_type != info.netif_type
             || self.netif_index != info.netif_index;
 
@@ -245,16 +259,8 @@ impl NetifInfoOwned {
             self.name = info.name.try_into().unwrap();
             self.operational = info.operational && l2_connected;
             self.hw_addr = hw_addr.try_into().unwrap();
-            self.ipv4_addr = if info.ipv4_addrs.is_empty() {
-                Ipv4Addr::UNSPECIFIED
-            } else {
-                info.ipv4_addrs[0]
-            };
-            self.ipv6_addr = if info.ipv6_addrs.is_empty() {
-                Ipv6Addr::UNSPECIFIED
-            } else {
-                info.ipv6_addrs[0]
-            };
+            self.ipv4_addr = ipv4_addr;
+            self.ipv6_addr = ipv6_addr;
             self.netif_type = info.netif_type;
             self.netif_index = info.netif_index;
         }

@@ -11,7 +11,7 @@ repository = "https://github.com/sysgrok/esp-idf-matter"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 build = "build.rs"
-rust-version = "1.78"
+rust-version = "1.84"
 
 #[lib]
 #harness = false
