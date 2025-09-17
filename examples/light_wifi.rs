@@ -61,7 +61,7 @@ mod example {
 
         info!("Starting...");
 
-        const STACK_SIZE: usize = 105 * 1024;
+        const STACK_SIZE: usize = 110 * 1024;
 
         ThreadSpawnConfiguration::set(&ThreadSpawnConfiguration {
             name: Some(c"matter"),
