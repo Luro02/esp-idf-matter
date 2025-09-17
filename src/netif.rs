@@ -240,8 +240,7 @@ impl NetifInfoOwned {
                 // For Wifi: locate the link-local Ipv6 address
                 info.ipv6_addrs
                     .iter()
-                    .filter(|ipv6| ipv6.is_unicast_link_local())
-                    .next()
+                    .find(|ipv6| ipv6.is_unicast_link_local())
             };
 
             ipv6_addr.copied().unwrap_or(Ipv6Addr::UNSPECIFIED)
