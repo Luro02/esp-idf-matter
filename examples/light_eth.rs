@@ -167,8 +167,7 @@ mod example {
             );
 
         // Run the Matter stack with our handler
-        // Using `pin!` is completely optional, but saves some memory due to `rustc`
-        // not being very intelligent w.r.t. stack usage in async functions
+        // Using `pin!` is completely optional, but reduces the size of the final future
         //
         // NOTE: When testing initially, use the `DummyKVBlobStore` to make sure device
         // commissioning works fine with your controller. Once you confirm, you can enable
