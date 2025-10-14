@@ -126,7 +126,7 @@ mod example {
         // Can be anything implementing `rs_matter::dm::AsyncHandler`
         let on_off = OnOffHandler::new_standalone(
             Dataver::new_rand(stack.matter().rand()),
-            1,
+            LIGHT_ENDPOINT_ID,
             TestOnOffDeviceLogic::new(),
         );
 
