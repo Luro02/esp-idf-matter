@@ -49,9 +49,6 @@ mod example {
 
     use alloc::sync::Arc;
 
-    use embassy_futures::select::select;
-    use embassy_time::{Duration, Timer};
-
     use esp_idf_matter::init_async_io;
     use esp_idf_matter::matter::dm::clusters::desc::{self, ClusterHandler as _, DescHandler};
     use esp_idf_matter::matter::dm::clusters::on_off::test::TestOnOffDeviceLogic;
@@ -60,7 +57,6 @@ mod example {
     use esp_idf_matter::matter::dm::devices::DEV_TYPE_ON_OFF_LIGHT;
     use esp_idf_matter::matter::dm::{Async, Dataver, EmptyHandler, Endpoint, EpClMatcher, Node};
     use esp_idf_matter::matter::utils::init::InitMaybeUninit;
-    use esp_idf_matter::matter::utils::select::Coalesce;
     use esp_idf_matter::matter::{clusters, devices};
     use esp_idf_matter::wireless::{EspMatterWifi, EspWifiMatterStack};
 
@@ -141,11 +137,11 @@ mod example {
         reduce_bt_memory(unsafe { peripherals.modem.reborrow() })?;
 
         // Our "light" on-off handler.
-        // Can be anything implementing `rs_matter::dm::AsyncHandler`
+        // It will toggle the light state every 5 seconds
         let on_off = OnOffHandler::new_standalone(
             Dataver::new_rand(stack.matter().rand()),
             LIGHT_ENDPOINT_ID,
-            TestOnOffDeviceLogic::new(),
+            TestOnOffDeviceLogic::new(true),
         );
 
         // Chain our endpoint clusters with the
@@ -174,7 +170,7 @@ mod example {
         // the `EspKvBlobStore` to persist the Matter state in NVS.
         // let store = stack.create_shared_store(esp_idf_matter::persist::EspKvBlobStore::new_default(nvs.clone())?);
         let store = stack.create_shared_store(rs_matter_stack::persist::DummyKvBlobStore);
-        let mut matter = pin!(stack.run_coex(
+        let matter = pin!(stack.run_coex(
             // The Matter stack needs the Wifi/BLE modem peripheral
             EspMatterWifi::new_with_builtin_mdns(peripherals.modem, sysloop, timers, nvs, stack),
             // The Matter stack needs a persister to store its state
@@ -185,29 +181,8 @@ mod example {
             (),
         ));
 
-        // Just for demoing purposes:
-        //
-        // Run a sample loop that simulates state changes triggered by the HAL
-        // Changes will be properly communicated to the Matter controllers
-        // (i.e. Google Home, Alexa) and other Matter devices thanks to subscriptions
-        let mut device = pin!(async {
-            loop {
-                // Simulate user toggling the light with a physical switch every 5 seconds
-                Timer::after(Duration::from_secs(5)).await;
-
-                // Toggle
-                on_off.set_on_off(!on_off.on_off());
-
-                // Let the Matter stack know that we have changed
-                // the state of our Light device
-                stack.notify_cluster_changed(1, TestOnOffDeviceLogic::CLUSTER.id);
-
-                info!("Light toggled");
-            }
-        });
-
-        // Schedule the Matter run & the device loop together
-        select(&mut matter, &mut device).coalesce().await?;
+        // Run Matter
+        matter.await?;
 
         Ok(())
     }
