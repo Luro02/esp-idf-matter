@@ -165,14 +165,15 @@ mod example {
                 Async(DescHandler::new(Dataver::new_rand(stack.matter().rand())).adapt()),
             );
 
+        // Create the persister & load any previously saved state
+        // `EspKvBlobStore` saves to a user-supplied ESP-IDF NVS partition
+        // However, for this demo and for simplicity, we use a dummy persister that does nothing
+        let persist = stack
+            .create_persist_with_comm_window(rs_matter_stack::persist::DummyKvBlobStore)
+            .await?;
+
         // Run the Matter stack with our handler
         // Using `pin!` is completely optional, but reduces the size of the final future
-        //
-        // NOTE: When testing initially, use the `DummyKVBlobStore` to make sure device
-        // commissioning works fine with your controller. Once you confirm, you can enable
-        // the `EspKvBlobStore` to persist the Matter state in NVS.
-        // let store = stack.create_shared_store(esp_idf_matter::persist::EspKvBlobStore::new_default(nvs.clone())?);
-        let store = stack.create_shared_store(rs_matter_stack::persist::DummyKvBlobStore);
         let matter = pin!(stack.run_preex(
             // The Matter stack needs UDP sockets to communicate with other Matter devices
             EspMatterNetStack::new(),
@@ -183,7 +184,7 @@ mod example {
             // The Matter stack needs an mDNS service to advertise itself
             EspMatterThreadSrp::new(&thread),
             // The Matter stack needs a persister to store its state
-            &store,
+            &persist,
             // Our `AsyncHandler` + `AsyncMetadata` impl
             (NODE, handler),
             // No user future to run
